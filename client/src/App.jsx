@@ -11,7 +11,7 @@ export default function App() {
   const [status,  setStatus]  = useState("checking...");
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/health")
+    fetch("https://my-backend.onrender.com/api/predict")
       .then(r => r.json())
       .then(d => setStatus(d.model_trained ? "✅ Model ready" : "⚠️ Not trained yet"))
       .catch(() => setStatus("❌ Service offline"));
