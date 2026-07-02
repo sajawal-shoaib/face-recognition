@@ -4,13 +4,17 @@ import ResultCard    from "./components/ResultCard.jsx";
 import HistoryTable  from "./components/HistoryTable.jsx";
 import TrainPanel    from "./components/TrainPanel.jsx";
 
+// Use the Vercel env variable automatically, or fall back to local if coding at home
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://face-recognition-backend-o4x9.onrender.com";
+
 export default function App() {
   const [result,  setResult]  = useState(null);
   const [history, setHistory] = useState([]);
   const [status,  setStatus]  = useState("checking...");
 
   useEffect(() => {
-    fetch("https://my-backend.onrender.com/api/predict")
+    // Fixed: Now calling your real live production endpoint
+    fetch(`${API_BASE_URL}/api/predict`)
       .then(r => r.json())
       .then(d => setStatus(d.model_trained ? "✅ Model ready" : "⚠️ Not trained yet"))
       .catch(() => setStatus("❌ Service offline"));
@@ -18,7 +22,8 @@ export default function App() {
   }, []);
 
   const loadHistory = () =>
-    fetch("http://localhost:5000/api/history")
+    // Fixed: Swapped out localhost for your production API base link
+    fetch(`${API_BASE_URL}/api/history`)
       .then(r => r.json())
       .then(setHistory)
       .catch(console.error);
@@ -27,6 +32,8 @@ export default function App() {
     setResult(data);
     loadHistory();
   };
+
+  // ... rest of your code (getBadgeStyle, return UI, and styles) remains exactly the same!
 
   // Dynamically change badge glow based on server status
   const getBadgeStyle = () => {
