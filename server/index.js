@@ -13,10 +13,29 @@ const app    = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // 2. Secured Cross-Origin Whitelisting
+// 2. Secured Cross-Origin Whitelisting (Flexible Production Arrays)
+const allowedOrigins = [
+  "http://localhost:5173",
+  "https://face-recognition-frontend.vercel.app",
+  // 💡 Add your exact Vercel URL here if it looks different in your browser bar:
+  // "https://face-recognition-frontend-your-profile.vercel.app" 
+];
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests, or server-to-server)
+    if (!origin) return callback(null, true);
+    
+    // Check if the current request origin exists in our whitelist array
+    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith(".vercel.app")) {
+      callback(null, true);
+    } else {
+      callback(new Error("Blocked by CORS Security Architecture"));
+    }
+  },
   credentials: true
 }));
+app.use(express.json());
 app.use(express.json());
 
 // ── MongoDB ───────────────────────────────────────────────
