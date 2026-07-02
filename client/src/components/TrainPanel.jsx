@@ -18,18 +18,19 @@ export default function TrainPanel() {
     }
   };
 
-  const handleTrain = async () => {
+ const handleTrain = async () => {
     if (!file) return;
 
     setLoading(true);
     setLog(null);
 
     const formData = new FormData();
-    formData.append("dataset", file);
+    // This key matches exactly what Python looks for: request.files["dataset"]
+    formData.append("dataset", file); 
 
     try {
-      // ✅ Fixed: Replaced localhost with your live API base URL link
-      const res = await fetch(`${API_BASE_URL}/api/train`, {
+      // 🚀 BYPASS NODE FORWARDING: Send directly to your live Python service!
+      const res = await fetch("https://face-recognition-python-nnti.onrender.com/train", {
         method: "POST",
         body: formData
       });
@@ -37,11 +38,9 @@ export default function TrainPanel() {
       setLog(data);
 
       if (res.ok) {
-        // ✅ Fixed: Force a minor state update reload so the parent badge in App.jsx 
-        // instantly reads the fresh true state from the Python engine memory array!
         setTimeout(() => {
           window.location.reload();
-        }, 800);
+        }, 1000);
       }
     } catch (e) {
       setLog({ error: e.message });
