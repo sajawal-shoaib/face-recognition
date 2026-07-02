@@ -14,20 +14,27 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 // 2. Secured Cross-Origin Whitelisting
 // 2. Secured Cross-Origin Whitelisting (Flexible Production Arrays)
+// 2. Secured Cross-Origin Whitelisting (Slash-Proof and Dynamic)
 const allowedOrigins = [
   "http://localhost:5173",
-  "https://face-recognition-frontend.vercel.app",
-  // 💡 Add your exact Vercel URL here if it looks different in your browser bar:
-  // "https://face-recognition-frontend-your-profile.vercel.app" 
+  "http://localhost:5173/",
+  "https://face-recognition-frontend-seven.vercel.app",
+  "https://face-recognition-frontend-seven.vercel.app/" // Added explicit trailing slash version
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl requests, or server-to-server)
+    // Allow server-to-server or locally initiated requests
     if (!origin) return callback(null, true);
     
-    // Check if the current request origin exists in our whitelist array
-    if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith(".vercel.app")) {
+    // Clean up trailing slash for string matching validation
+    const cleanOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
+
+    if (
+      allowedOrigins.includes(origin) || 
+      allowedOrigins.includes(cleanOrigin) ||
+      cleanOrigin.endsWith(".vercel.app")
+    ) {
       callback(null, true);
     } else {
       callback(new Error("Blocked by CORS Security Architecture"));
@@ -35,7 +42,6 @@ app.use(cors({
   },
   credentials: true
 }));
-app.use(express.json());
 app.use(express.json());
 
 // ── MongoDB ───────────────────────────────────────────────
