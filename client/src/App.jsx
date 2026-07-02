@@ -13,10 +13,13 @@ export default function App() {
   const [status,  setStatus]  = useState("checking...");
 
   useEffect(() => {
-    // Fixed: Now calling your real live production endpoint
-    fetch(`${API_BASE_URL}/api/predict`)
+    // Fixed: Swapped /api/predict (POST) with /api/health (GET)
+    fetch(`${API_BASE_URL}/api/health`)
       .then(r => r.json())
-      .then(d => setStatus(d.model_trained ? "✅ Model ready" : "⚠️ Not trained yet"))
+      .then(d => {
+        // Handle your health status response checking smoothly
+        setStatus(d.status === "python service unreachable" ? "⚠️ Python Offline" : "✅ Model ready");
+      })
       .catch(() => setStatus("❌ Service offline"));
     loadHistory();
   }, []);
