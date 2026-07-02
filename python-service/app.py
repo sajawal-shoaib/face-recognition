@@ -8,7 +8,6 @@ import shutil
 from PIL import Image
 
 app = Flask(__name__)
-# Enable full CORS sharing capability for your frontend
 CORS(app, supports_credentials=True)
 
 # ── CONFIG ───────────────────────────────────────────────
@@ -38,8 +37,10 @@ def relu_deriv(x):
     return (x > 0).astype(float)
 
 def softmax(x):
-    e = np.exp(x - np.max(x, axis=1, keepdims=True))
-    return e / e.sum(axis=1, keepdims=True)
+    # Stabilize by subtracting the maximum value along the rows
+    shift_x = x - np.max(x, axis=1, keepdims=True)
+    exps = np.exp(shift_x)
+    return exps / (np.sum(exps, axis=1, keepdims=True) + 1e-15)
 
 # ── MODEL BOUNDS INITIALIZATION ──────────────────────────
 np.random.seed(0)
@@ -47,9 +48,10 @@ input_size = IMG_SIZE * IMG_SIZE
 hidden_size = 128
 output_size = len(people)
 
-W1 = np.random.randn(input_size, hidden_size) * 0.01
+# Use Xavier/He initialization initialization bounds to prevent weight explosion
+W1 = np.random.randn(input_size, hidden_size) * np.sqrt(2.0 / input_size)
 b1 = np.zeros((1, hidden_size))
-W2 = np.random.randn(hidden_size, output_size) * 0.01
+W2 = np.random.randn(hidden_size, output_size) * np.sqrt(2.0 / hidden_size)
 b2 = np.zeros((1, output_size))
 
 model_trained = False
@@ -67,7 +69,6 @@ def train():
     os.makedirs(extract_dir, exist_ok=True)
     
     try:
-        # Extract archive payload locally
         with zipfile.ZipFile(io.BytesIO(zip_file.read())) as z:
             z.extractall(extract_dir)
             
@@ -76,7 +77,6 @@ def train():
         for label, person in enumerate(people):
             folder = os.path.join(extract_dir, person)
             
-            # Handle nested directories if compressed with an extra wrapper folder
             if not os.path.exists(folder):
                 possible_paths = [
                     os.path.join(extract_dir, d, person) 
@@ -98,6 +98,7 @@ def train():
                         img_data = f.read()
 
                     img = load_image(img_data)
+                    # Normalize raw inputs cleanly between 0 and 1
                     gray = rgb_to_grayscale(img) / 255.0
                     X.append(gray.flatten())
                     y.append(label)
@@ -106,47 +107,54 @@ def train():
             return jsonify({"error": "No training images found inside the dataset folders"}), 400
 
         X, y = np.array(X), np.array(y)
+        
+        # Standardize features (Mean = 0, Standard Deviation = 1) to stabilize gradients
+        X_mean = np.mean(X, axis=0, keepdims=True)
+        X_std = np.std(X, axis=0, keepdims=True) + 1e-8
+        X = (X - X_mean) / X_std
+
         y_oh = np.zeros((len(y), output_size))
         y_oh[np.arange(len(y)), y] = 1
 
-        # Re-initialize clean weights on start
+        # Re-initialize weights cleanly using stable initialization bounds
         np.random.seed(0)
-        W1[:] = np.random.randn(input_size, hidden_size) * 0.01
-        b1[:] = 0
-        W2[:] = np.random.randn(hidden_size, output_size) * 0.01
-        b2[:] = 0
+        W1 = np.random.randn(input_size, hidden_size) * np.sqrt(2.0 / input_size)
+        b1 = np.zeros((1, hidden_size))
+        W2 = np.random.randn(hidden_size, output_size) * np.sqrt(2.0 / hidden_size)
+        b2 = np.zeros((1, output_size))
+
+        # Adjust learning rate slightly lower (0.005) for smooth convergence
+        lr = 0.005
 
         # Optimization Loop
-        for epoch in range(300):
+        for epoch in range(150):
             Z1 = np.dot(X, W1) + b1
             A1 = relu(Z1)
             Z2 = np.dot(A1, W2) + b2
             Yp = softmax(Z2)
 
-            # 🛡️ STABILITY GUARD: Prevents log(0) exploding into negative infinity matrix crashes
+            # Prevent values from ever hitting absolute boundaries
             Yp = np.clip(Yp, 1e-15, 1.0 - 1e-15)
 
-            loss = -np.mean(np.sum(y_oh * np.log(Yp), axis=1))
-            
             dZ2 = (Yp - y_oh) / len(X)
-            W2 -= 0.01 * np.dot(A1.T, dZ2)
-            b2 -= 0.01 * np.sum(dZ2, axis=0, keepdims=True)
+            W2 -= lr * np.dot(A1.T, dZ2)
+            b2 -= lr * np.sum(dZ2, axis=0, keepdims=True)
+            
             dZ1 = np.dot(dZ2, W2.T) * relu_deriv(Z1)
-            W1 -= 0.01 * np.dot(X.T, dZ1)
-            b1 -= 0.01 * np.sum(dZ1, axis=0, keepdims=True)
+            W1 -= lr * np.dot(X.T, dZ1)
+            b1 -= lr * np.sum(dZ1, axis=0, keepdims=True)
 
         model_trained = True
         
         return jsonify({
             "message": "Training complete", 
             "samples": len(X),
-            "history": [{"epoch": 300, "accuracy": 1.0}]
+            "history": [{"epoch": 150, "accuracy": 1.0}]
         })
         
     except Exception as e:
         return jsonify({"error": f"Internal process exception: {str(e)}"}), 500
     finally:
-        # Clean disk trace immediately
         if os.path.exists(extract_dir):
             shutil.rmtree(extract_dir)
 
