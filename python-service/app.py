@@ -1,10 +1,12 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # <-- Added for cross-origin security layers
 import numpy as np
 import os
 import io
 from PIL import Image
 
 app = Flask(__name__)
+CORS(app, supports_credentials=True)  # <-- Added to accept external microservice handshakes
 
 # ── CONFIG ───────────────────────────────────────────────
 IMG_SIZE = 64
@@ -13,8 +15,7 @@ people = ["sajawal", "ali"]
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 DATASET_DIR = os.path.join(BASE_DIR, "dataset")
 
-# ── IMAGE LOADER (FIXED) ────────────────────────────────
-
+# ── IMAGE LOADER ─────────────────────────────────────────
 def load_image(data):
     img = Image.open(io.BytesIO(data))
     img = img.convert("RGB")          # ensure 3 channels
@@ -39,7 +40,6 @@ def softmax(x):
     return e / e.sum(axis=1, keepdims=True)
 
 # ── MODEL INIT ───────────────────────────────────────────
-
 np.random.seed(0)
 input_size = IMG_SIZE * IMG_SIZE
 hidden_size = 128
@@ -52,14 +52,12 @@ b2 = np.zeros((1, output_size))
 
 model_trained = False
 
-# ── TRAIN ────────────────────────────────────────────────
-
-@app.route("/train", methods=["POST"])
+# ── TRAIN (Updated to /api/train) ────────────────────────
+@app.route("/api/train", methods=["POST"])
 def train():
     global W1, b1, W2, b2, model_trained
 
     dataset_path = DATASET_DIR   # FORCE correct path
-
     X, y = [], []
 
     for label, person in enumerate(people):
@@ -81,6 +79,9 @@ def train():
                 X.append(gray.flatten())
                 y.append(label)
 
+    if len(X) == 0:
+        return jsonify({"error": "No training images found in dataset directory"}), 400
+
     X = np.array(X)
     y = np.array(y)
 
@@ -98,7 +99,7 @@ def train():
     history = []
 
     # training loop
-    for epoch in range(300):  # faster training
+    for epoch in range(300):
         Z1 = np.dot(X, W1) + b1
         A1 = relu(Z1)
         Z2 = np.dot(A1, W2) + b2
@@ -127,6 +128,10 @@ def train():
                 "accuracy": float(acc)
             })
 
+    # Record final state parameters
+    acc = np.mean(np.argmax(Yp, axis=1) == y)
+    history.append({"epoch": 300, "loss": float(loss), "accuracy": float(acc)})
+    
     model_trained = True
 
     return jsonify({
@@ -135,9 +140,8 @@ def train():
         "history": history
     })
 
-# ── PREDICT ──────────────────────────────────────────────
-
-@app.route("/predict", methods=["POST"])
+# ── PREDICT (Updated to /api/predict) ────────────────────
+@app.route("/api/predict", methods=["POST"])
 def predict():
     if not model_trained:
         return jsonify({"error": "Model not trained yet"}), 400
@@ -164,9 +168,8 @@ def predict():
         }
     })
 
-# ── HEALTH ───────────────────────────────────────────────
-
-@app.route("/health")
+# ── HEALTH (Updated to /api/health) ──────────────────────
+@app.route("/api/health")
 def health():
     return jsonify({
         "status": "ok",
@@ -174,7 +177,9 @@ def health():
         "people": people
     })
 
-# ── RUN ──────────────────────────────────────────────────
-
+# ── DYNAMIC RUN ENGINE ───────────────────────────────────
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5001, debug=True)
+    # Pull dynamic server allocation port context from Render
+    port = int(os.environ.get("PORT", 5000))
+    # host '0.0.0.0' explicitly commands container loops to accept public web traffic
+    app.run(host="0.0.0.0", port=port, debug=False)

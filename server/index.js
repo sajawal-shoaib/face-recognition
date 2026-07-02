@@ -6,24 +6,31 @@ const FormData   = require("form-data");
 const fetch      = require("node-fetch");
 const Prediction = require("./models/Prediction");
 
+// 1. Core Environment Configuration Mapping Layer
+require('dotenv').config();
+
 const app    = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-app.use(cors());
+// 2. Secured Cross-Origin Whitelisting
+app.use(cors({
+  origin: process.env.FRONTEND_URL || "http://localhost:5173",
+  credentials: true
+}));
 app.use(express.json());
 
 // ── MongoDB ───────────────────────────────────────────────
-mongoose.connect("mongodb+srv://sajawal:<sajawal202>@interview-ai.xl8zai3.mongodb.net/?appName=INTERVIEW-AI")
-  .then(() => console.log("MongoDB connected"))
-  .catch(err => console.error(err));
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch(err => console.error("Database connection error:", err));
 
-const PYTHON_URL = "http://localhost:5001";
+const PYTHON_URL = process.env.FLASK_SERVICE_URL || "http://127.0.0.1:5000";
 
 // ── POST /api/predict ─────────────────────────────────────
-// Receives BMP from React → forwards to Python → saves to MongoDB
 app.post("/api/predict", upload.single("image"), async (req, res) => {
   try {
-    // Forward image to Python microservice
+    if (!req.file) return res.status(400).json({ error: "No image matrix file provided." });
+
     const form = new FormData();
     form.append("image", req.file.buffer, {
       filename:    req.file.originalname,
@@ -35,7 +42,6 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
 
     if (!pyRes.ok) return res.status(400).json(result);
 
-    // Save to MongoDB
     const doc = await Prediction.create({
       filename:      req.file.originalname,
       predicted:     result.predicted,
@@ -85,4 +91,6 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-app.listen(5000, () => console.log("Node server running on port 5000"));
+// 3. Dynamic Execution Port Binding
+const PORT = process.env.PORT || 5001;
+app.listen(PORT, () => console.log(`🚀 Node pipeline operational on port ${PORT}`));

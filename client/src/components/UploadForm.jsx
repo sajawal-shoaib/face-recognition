@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 
 export default function UploadForm({ onResult }) {
   const [file,    setFile]    = useState(null);
@@ -6,8 +6,10 @@ export default function UploadForm({ onResult }) {
   const [error,   setError]   = useState("");
 
   const handleSubmit = async () => {
-    if (!file) return setError("Please select a BMP file");
-    setError(""); setLoading(true);
+    if (!file) return setError("Please select a BMP file first.");
+    setError(""); 
+    setLoading(true);
+    
     try {
       const fd = new FormData();
       fd.append("image", file);
@@ -17,31 +19,164 @@ export default function UploadForm({ onResult }) {
       onResult(data);
     } catch (e) {
       setError(e.message);
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   return (
-    <div style={card}>
-      <h2 style={heading}>Upload Image</h2>
-      <label style={dropZone}>
-        <input type="file" accept=".bmp" hidden
-          onChange={e => { setFile(e.target.files[0]); setError(""); }} />
-        {file ? <span>📄 {file.name}</span> : <span>Click to select a <b>.bmp</b> file</span>}
+    <div style={styles.card}>
+      <div style={styles.headerContainer}>
+        <h2 style={styles.heading}>🔍 Image Inference</h2>
+        <p style={styles.subheading}>Upload a high-resolution bitmap image to parse the deep learning weights grid.</p>
+      </div>
+
+      {/* Styled Interactive File Upload Dropzone */}
+      <label style={styles.dropZone(file)}>
+        <input 
+          type="file" 
+          accept=".bmp" 
+          hidden
+          onChange={e => { setFile(e.target.files[0]); setError(""); }} 
+        />
+        <div style={styles.uploadContent}>
+          <span style={styles.uploadIcon}>{file ? "📸" : "🖼️"}</span>
+          <span style={styles.uploadText}>
+            {file ? file.name : "Select or Drop BMP image"}
+          </span>
+          {!file && <span style={styles.uploadSubtext}>Standard Windows Bitmap (.bmp) required</span>}
+        </div>
       </label>
-      {error && <p style={{ color:"#f87171", margin:"0.5rem 0 0" }}>{error}</p>}
-      <button style={btn(loading)} onClick={handleSubmit} disabled={loading}>
-        {loading ? "Predicting…" : "🔍 Predict"}
+
+      {/* Error Indicator Box */}
+      {error && (
+        <div style={styles.errorContainer}>
+          <span style={styles.errorIcon}>⚠️</span>
+          <p style={styles.errorText}>{error}</p>
+        </div>
+      )}
+
+      {/* Modern Processing Action Button */}
+      <button 
+        style={styles.btn(loading, file)} 
+        onClick={handleSubmit} 
+        disabled={loading || !file}
+      >
+        {loading ? (
+          <div style={styles.loaderContainer}>
+            <span style={styles.spinner}></span>
+            <span>Evaluating Neural Network...</span>
+          </div>
+        ) : (
+          "Execute Matrix Prediction"
+        )}
       </button>
     </div>
   );
 }
 
-const card    = { background:"#1e293b", borderRadius:"12px", padding:"1.5rem", border:"1px solid #334155" };
-const heading = { margin:"0 0 1rem", fontSize:"1.1rem" };
-const dropZone= { display:"flex", alignItems:"center", justifyContent:"center", height:"100px",
-                  border:"2px dashed #475569", borderRadius:"8px", cursor:"pointer",
-                  color:"#94a3b8", marginBottom:"1rem" };
-const btn = (loading) => ({
-  width:"100%", padding:"0.75rem", borderRadius:"8px", border:"none", cursor:"pointer",
-  background: loading ? "#475569" : "#6366f1", color:"#fff", fontWeight:"bold", fontSize:"1rem"
-});
+// Unified Slate Cyberpunk Design Language
+const styles = {
+  card: { 
+    background: "#1e293b", 
+    borderRadius: "16px", 
+    padding: "2rem", 
+    border: "1px solid rgba(51, 65, 85, 0.7)",
+    boxShadow: "0 4px 30px rgba(0, 0, 0, 0.2)",
+    display: "flex",
+    flexDirection: "column",
+    gap: "1.5rem"
+  },
+  headerContainer: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px"
+  },
+  heading: { 
+    margin: 0, 
+    fontSize: "1.2rem",
+    fontWeight: "600",
+    color: "#f8fafc",
+    letterSpacing: "-0.01em"
+  },
+  subheading: {
+    margin: 0,
+    fontSize: "0.8rem",
+    color: "#94a3b8",
+    lineHeight: "1.4"
+  },
+  // Dynamic state dropzone layout
+  dropZone: (hasFile) => ({ 
+    display: "flex", 
+    alignItems: "center", 
+    justifyContent: "center", 
+    padding: "2.5rem 1.5rem",
+    border: hasFile ? "2px solid rgba(99, 102, 241, 0.5)" : "2px dashed #475569", 
+    borderRadius: "12px", 
+    cursor: "pointer",
+    background: hasFile ? "rgba(99, 102, 241, 0.04)" : "#0f172a",
+    transition: "all 0.2s ease-in-out",
+    textAlign: "center"
+  }),
+  uploadContent: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "0.5rem"
+  },
+  uploadIcon: {
+    fontSize: "2rem",
+    marginBottom: "2px"
+  },
+  uploadText: {
+    fontSize: "0.9rem",
+    fontWeight: "500",
+    color: "#e2e8f0"
+  },
+  uploadSubtext: {
+    fontSize: "0.75rem",
+    color: "#64748b"
+  },
+  errorContainer: {
+    display: "flex",
+    gap: "0.5rem",
+    alignItems: "center",
+    background: "rgba(239, 68, 68, 0.08)",
+    border: "1px solid rgba(239, 68, 68, 0.2)",
+    borderRadius: "10px",
+    padding: "0.85rem 1rem",
+  },
+  errorIcon: {
+    fontSize: "1rem"
+  },
+  errorText: {
+    margin: 0,
+    fontSize: "0.82rem",
+    color: "#f87171",
+    fontWeight: "500"
+  },
+  // Action trigger configurations
+  btn: (loading, file) => ({
+    width: "100%", 
+    padding: "0.85rem", 
+    borderRadius: "10px", 
+    border: "none", 
+    cursor: loading || !file ? "not-allowed" : "pointer",
+    background: loading 
+      ? "rgba(71, 85, 105, 0.5)" 
+      : !file 
+        ? "#334155" 
+        : "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)", 
+    color: !file ? "#64748b" : "#ffffff", 
+    fontWeight: "600", 
+    fontSize: "0.95rem",
+    transition: "all 0.2s ease",
+    boxShadow: file && !loading ? "0 4px 14px 0 rgba(99, 102, 241, 0.3)" : "none"
+  }),
+  loaderContainer: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px"
+  }
+};
