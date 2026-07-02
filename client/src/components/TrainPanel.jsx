@@ -1,5 +1,8 @@
 import React, { useState } from "react";
 
+// Use the exact same environment fallback rule we set up in App.jsx
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://face-recognition-backend-o4x9.onrender.com";
+
 export default function TrainPanel() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -21,12 +24,21 @@ export default function TrainPanel() {
     formData.append("dataset", file);
 
     try {
-      const res = await fetch("http://localhost:5000/api/train", {
+      // ✅ Fixed: Replaced localhost with your live API base URL link
+      const res = await fetch(`${API_BASE_URL}/api/train`, {
         method: "POST",
         body: formData
       });
       const data = await res.json();
       setLog(data);
+
+      if (res.ok) {
+        // ✅ Fixed: Force a minor state update reload so the parent badge in App.jsx 
+        // instantly reads the fresh true state from the Python engine memory array!
+        setTimeout(() => {
+          window.location.reload();
+        }, 800);
+      }
     } catch (e) {
       setLog({ error: e.message });
     } finally {
@@ -41,7 +53,6 @@ export default function TrainPanel() {
         <p style={styles.subheading}>Upload your dataset file to initiate deep learning weights optimization.</p>
       </div>
 
-      {/* Styled Interactive File Upload Dropzone */}
       <label style={styles.uploadZone(file)}>
         <input 
           type="file" 
@@ -73,7 +84,6 @@ export default function TrainPanel() {
         )}
       </button>
 
-      {/* Modern Status Logs Container */}
       {log && (
         <div style={log.error ? styles.errorLog : styles.successLog}>
           {log.error ? (
@@ -87,9 +97,11 @@ export default function TrainPanel() {
               <div style={styles.metricsContainer}>
                 <p style={styles.logText}><strong>Training Complete!</strong></p>
                 <p style={styles.subMetrics}>• Processed Samples: {log.samples}</p>
-                <p style={styles.subMetrics}>
-                  • Final Accuracy: <span style={styles.accuracyHighlight}>{(log.history.at(-1).accuracy * 100).toFixed(1)}%</span>
-                </p>
+                {log.history && log.history.length > 0 && (
+                  <p style={styles.subMetrics}>
+                    • Final Accuracy: <span style={styles.accuracyHighlight}>{(log.history.at(-1).accuracy * 100).toFixed(1)}%</span>
+                  </p>
+                )}
               </div>
             </>
           )}
@@ -99,7 +111,6 @@ export default function TrainPanel() {
   );
 }
 
-// Professional Deep Slate styling layout
 const styles = {
   card: {
     background: "#1e293b",
@@ -111,28 +122,10 @@ const styles = {
     flexDirection: "column",
     gap: "1.5rem"
   },
-  headerContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px"
-  },
-  heading: {
-    margin: 0,
-    fontSize: "1.2rem",
-    fontWeight: "600",
-    color: "#f8fafc",
-    letterSpacing: "-0.01em"
-  },
-  subheading: {
-    margin: 0,
-    fontSize: "0.8rem",
-    color: "#94a3b8",
-    lineHeight: "1.4"
-  },
-  hiddenInput: {
-    display: "none"
-  },
-  // Dynamic file selector styles
+  headerContainer: { display: "flex", flexDirection: "column", gap: "4px" },
+  heading: { margin: 0, fontSize: "1.2rem", fontWeight: "600", color: "#f8fafc", letterSpacing: "-0.01em" },
+  subheading: { margin: 0, fontSize: "0.8rem", color: "#94a3b8", lineHeight: "1.4" },
+  hiddenInput: { display: "none" },
   uploadZone: (hasFile) => ({
     display: "flex",
     alignItems: "center",
@@ -145,26 +138,10 @@ const styles = {
     transition: "all 0.2s ease-in-out",
     textAlign: "center"
   }),
-  uploadContent: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    gap: "0.5rem"
-  },
-  uploadIcon: {
-    fontSize: "2rem",
-    marginBottom: "2px"
-  },
-  uploadText: {
-    fontSize: "0.9rem",
-    fontWeight: "500",
-    color: "#e2e8f0"
-  },
-  uploadSubtext: {
-    fontSize: "0.75rem",
-    color: "#64748b"
-  },
-  // Dynamic glow-state action button
+  uploadContent: { display: "flex", flexDirection: "column", alignParagraphs: "center", alignItems: "center", gap: "0.5rem" },
+  uploadIcon: { fontSize: "2rem", marginBottom: "2px" },
+  uploadText: { fontSize: "0.9rem", fontWeight: "500", color: "#e2e8f0" },
+  uploadSubtext: { fontSize: "0.75rem", color: "#64748b" },
   btn: (loading, file) => ({
     width: "100%",
     padding: "0.85rem",
@@ -182,50 +159,12 @@ const styles = {
     transition: "all 0.2s ease",
     boxShadow: file && !loading ? "0 4px 14px 0 rgba(56, 189, 248, 0.3)" : "none"
   }),
-  loaderContainer: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: "10px"
-  },
-  // Metric blocks
-  successLog: {
-    display: "flex",
-    gap: "0.75rem",
-    background: "rgba(16, 185, 129, 0.08)",
-    border: "1px solid rgba(16, 185, 129, 0.2)",
-    borderRadius: "10px",
-    padding: "1rem"
-  },
-  errorLog: {
-    display: "flex",
-    gap: "0.75rem",
-    background: "rgba(239, 68, 68, 0.08)",
-    border: "1px solid rgba(239, 68, 68, 0.2)",
-    borderRadius: "10px",
-    padding: "1rem"
-  },
-  logIcon: {
-    fontSize: "1.1rem",
-    marginTop: "2px"
-  },
-  metricsContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px"
-  },
-  logText: {
-    margin: 0,
-    fontSize: "0.88rem",
-    color: "#f1f5f9"
-  },
-  subMetrics: {
-    margin: 0,
-    fontSize: "0.82rem",
-    color: "#94a3b8"
-  },
-  accuracyHighlight: {
-    color: "#34d399",
-    fontWeight: "600"
-  }
+  loaderContainer: { display: "flex", alignItems: "center", justifyContent: "center", gap: "10px" },
+  successLog: { display: "flex", gap: "0.75rem", background: "rgba(16, 185, 129, 0.08)", border: "1px solid rgba(16, 185, 129, 0.2)", borderRadius: "10px", padding: "1rem" },
+  errorLog: { display: "flex", gap: "0.75rem", background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: "10px", padding: "1rem" },
+  logIcon: { fontSize: "1.1rem", marginTop: "2px" },
+  metricsContainer: { display: "flex", flexDirection: "column", gap: "4px" },
+  logText: { margin: 0, fontSize: "0.88rem", color: "#f1f5f9" },
+  subMetrics: { margin: 0, fontSize: "0.82rem", color: "#94a3b8" },
+  accuracyHighlight: { color: "#34d399", fontWeight: "600" }
 };
