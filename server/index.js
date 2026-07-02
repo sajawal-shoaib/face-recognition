@@ -6,13 +6,11 @@ const FormData   = require("form-data");
 const fetch      = require("node-fetch");
 const Prediction = require("./models/Prediction");
 
-// 1. Core Environment Configuration Mapping Layer
 require('dotenv').config();
 
 const app    = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
-// 2. Secured Cross-Origin Whitelisting
 const allowedOrigins = [
   "http://localhost:5173",
   "https://face-recognition-frontend-seven.vercel.app"
@@ -20,10 +18,8 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow server-to-server, curl, or mobile app requests that lack an origin header
     if (!origin) return callback(null, true);
     
-    // Clean trailing slashes
     const cleanOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
 
     if (
@@ -37,7 +33,7 @@ app.use(cors({
     }
   },
   credentials: true,
-  optionsSuccessStatus: 200 // Essential for older browser compatibility and some preflight handlers
+  optionsSuccessStatus: 200
 }));
 
 app.use(express.json());
@@ -81,7 +77,7 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
 // ── POST /api/train ───────────────────────────────────────
 app.post("/api/train", async (req, res) => {
   try {
-    const pyRes  = await fetch(`${FLASK_SERVICE_URL}/train`, {
+    const pyRes  = await fetch(`${PYTHON_URL}/train`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ dataset_path: req.body.dataset_path || "dataset" }),
@@ -104,11 +100,9 @@ app.get("/api/history", async (req, res) => {
 });
 
 // ── GET /api/health ───────────────────────────────────────
-// Fix: Ensure the route responds immediately to the frontend layout indicator
 app.get("/api/health", async (req, res) => {
   try {
-    // Check if Python service is alive, but don't crash the whole response if it's sleeping
-    const pyRes  = await fetch(`${FLASK_SERVICE_URL}/health`);
+    const pyRes  = await fetch(`${PYTHON_URL}/health`);
     const pythonStatus = pyRes.ok ? await pyRes.json() : { status: "sleeping" };
     
     res.json({
@@ -117,7 +111,6 @@ app.get("/api/health", async (req, res) => {
       pythonService: pythonStatus
     });
   } catch (err) {
-    // Even if Python is completely down, Node is up, so return 200 to clear the offline badge
     res.json({ 
       status: "online", 
       pythonService: "unreachable" 
@@ -125,6 +118,5 @@ app.get("/api/health", async (req, res) => {
   }
 });
 
-// 3. Dynamic Execution Port Binding
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => console.log(`🚀 Node pipeline operational on port ${PORT}`));

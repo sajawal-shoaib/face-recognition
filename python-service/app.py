@@ -37,7 +37,6 @@ def relu_deriv(x):
     return (x > 0).astype(float)
 
 def softmax(x):
-    # Stabilize by subtracting the maximum value along the rows
     shift_x = x - np.max(x, axis=1, keepdims=True)
     exps = np.exp(shift_x)
     return exps / (np.sum(exps, axis=1, keepdims=True) + 1e-15)
@@ -48,7 +47,6 @@ input_size = IMG_SIZE * IMG_SIZE
 hidden_size = 128
 output_size = len(people)
 
-# Use Xavier/He initialization initialization bounds to prevent weight explosion
 W1 = np.random.randn(input_size, hidden_size) * np.sqrt(2.0 / input_size)
 b1 = np.zeros((1, hidden_size))
 W2 = np.random.randn(hidden_size, output_size) * np.sqrt(2.0 / hidden_size)
@@ -56,10 +54,14 @@ b2 = np.zeros((1, output_size))
 
 model_trained = False
 
+# Global standard scaling vars needed for prediction
+X_mean = None
+X_std = None
+
 # ── PIPELINE TRAINING ROUTE ──────────────────────────────
 @app.route("/train", methods=["POST"])
 def train():
-    global W1, b1, W2, b2, model_trained
+    global W1, b1, W2, b2, model_trained, X_mean, X_std
     
     if "dataset" not in request.files:
         return jsonify({"error": "No dataset zip archive provided"}), 400
@@ -98,7 +100,6 @@ def train():
                         img_data = f.read()
 
                     img = load_image(img_data)
-                    # Normalize raw inputs cleanly between 0 and 1
                     gray = rgb_to_grayscale(img) / 255.0
                     X.append(gray.flatten())
                     y.append(label)
@@ -108,7 +109,7 @@ def train():
 
         X, y = np.array(X), np.array(y)
         
-        # Standardize features (Mean = 0, Standard Deviation = 1) to stabilize gradients
+        # Standardize features globally
         X_mean = np.mean(X, axis=0, keepdims=True)
         X_std = np.std(X, axis=0, keepdims=True) + 1e-8
         X = (X - X_mean) / X_std
@@ -116,24 +117,20 @@ def train():
         y_oh = np.zeros((len(y), output_size))
         y_oh[np.arange(len(y)), y] = 1
 
-        # Re-initialize weights cleanly using stable initialization bounds
         np.random.seed(0)
         W1 = np.random.randn(input_size, hidden_size) * np.sqrt(2.0 / input_size)
         b1 = np.zeros((1, hidden_size))
         W2 = np.random.randn(hidden_size, output_size) * np.sqrt(2.0 / hidden_size)
         b2 = np.zeros((1, output_size))
 
-        # Adjust learning rate slightly lower (0.005) for smooth convergence
         lr = 0.005
 
-        # Optimization Loop
         for epoch in range(60):
             Z1 = np.dot(X, W1) + b1
             A1 = relu(Z1)
             Z2 = np.dot(A1, W2) + b2
             Yp = softmax(Z2)
 
-            # Prevent values from ever hitting absolute boundaries
             Yp = np.clip(Yp, 1e-15, 1.0 - 1e-15)
 
             dZ2 = (Yp - y_oh) / len(X)
@@ -169,6 +166,9 @@ def predict():
     data = request.files["image"].read()
     img = load_image(data)
     flat = (rgb_to_grayscale(img) / 255.0).flatten().reshape(1, -1)
+    
+    # Apply standard scaling from training
+    flat = (flat - X_mean) / X_std
     
     output = softmax(np.dot(relu(np.dot(flat, W1) + b1), W2) + b2)
     idx = int(np.argmax(output))
