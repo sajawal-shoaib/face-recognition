@@ -8,6 +8,7 @@ import shutil
 from PIL import Image
 
 app = Flask(__name__)
+# Enable full CORS sharing capability for your frontend
 CORS(app, supports_credentials=True)
 
 # ── CONFIG ───────────────────────────────────────────────
@@ -16,7 +17,7 @@ people = ["sajawal", "ali"]
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# ── IMAGE LOADER ─────────────────────────────────────────
+# ── IMAGE PROCESSING UTILS ───────────────────────────────
 def load_image(data):
     img = Image.open(io.BytesIO(data))
     img = img.convert("RGB")
@@ -40,7 +41,7 @@ def softmax(x):
     e = np.exp(x - np.max(x, axis=1, keepdims=True))
     return e / e.sum(axis=1, keepdims=True)
 
-# ── MODEL INIT ───────────────────────────────────────────
+# ── MODEL BOUNDS INITIALIZATION ──────────────────────────
 np.random.seed(0)
 input_size = IMG_SIZE * IMG_SIZE
 hidden_size = 128
@@ -53,7 +54,7 @@ b2 = np.zeros((1, output_size))
 
 model_trained = False
 
-# ── TRAIN ROUTE ──────────────────────────────────────────
+# ── PIPELINE TRAINING ROUTE ──────────────────────────────
 @app.route("/train", methods=["POST"])
 def train():
     global W1, b1, W2, b2, model_trained
@@ -66,6 +67,7 @@ def train():
     os.makedirs(extract_dir, exist_ok=True)
     
     try:
+        # Extract archive payload locally
         with zipfile.ZipFile(io.BytesIO(zip_file.read())) as z:
             z.extractall(extract_dir)
             
@@ -74,15 +76,20 @@ def train():
         for label, person in enumerate(people):
             folder = os.path.join(extract_dir, person)
             
+            # Handle nested directories if compressed with an extra wrapper folder
             if not os.path.exists(folder):
-                possible_paths = [os.path.join(extract_dir, d, person) for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
+                possible_paths = [
+                    os.path.join(extract_dir, d, person) 
+                    for d in os.listdir(extract_dir) 
+                    if os.path.isdir(os.path.join(extract_dir, d))
+                ]
                 for p in possible_paths:
                     if os.path.exists(p):
                         folder = p
                         break
 
             if not os.path.exists(folder):
-                return jsonify({"error": f"Folder '{person}' not found inside zip archive."}), 400
+                return jsonify({"error": f"Folder '{person}' not found inside zip archive layers."}), 400
 
             for file in os.listdir(folder):
                 if file.lower().endswith((".bmp", ".jpg", ".png")):
@@ -102,19 +109,25 @@ def train():
         y_oh = np.zeros((len(y), output_size))
         y_oh[np.arange(len(y)), y] = 1
 
+        # Re-initialize clean weights on start
         np.random.seed(0)
         W1[:] = np.random.randn(input_size, hidden_size) * 0.01
         b1[:] = 0
         W2[:] = np.random.randn(hidden_size, output_size) * 0.01
         b2[:] = 0
 
+        # Optimization Loop
         for epoch in range(300):
             Z1 = np.dot(X, W1) + b1
             A1 = relu(Z1)
             Z2 = np.dot(A1, W2) + b2
             Yp = softmax(Z2)
 
-            loss = -np.mean(np.sum(y_oh * np.log(Yp + 1e-7), axis=1))
+            # 🛡️ STABILITY GUARD: Prevents log(0) exploding into negative infinity matrix crashes
+            Yp = np.clip(Yp, 1e-15, 1.0 - 1e-15)
+
+            loss = -np.mean(np.sum(y_oh * np.log(Yp), axis=1))
+            
             dZ2 = (Yp - y_oh) / len(X)
             W2 -= 0.01 * np.dot(A1.T, dZ2)
             b2 -= 0.01 * np.sum(dZ2, axis=0, keepdims=True)
@@ -131,22 +144,24 @@ def train():
         })
         
     except Exception as e:
-        return jsonify({"error": f"Failed parsing zip architecture: {str(e)}"}), 500
+        return jsonify({"error": f"Internal process exception: {str(e)}"}), 500
     finally:
+        # Clean disk trace immediately
         if os.path.exists(extract_dir):
             shutil.rmtree(extract_dir)
 
-# ── PREDICT ROUTE ────────────────────────────────────────
+# ── INFERENCE EVALUATION ROUTE ───────────────────────────
 @app.route("/predict", methods=["POST"])
 def predict():
     if not model_trained:
-        return jsonify({"error": "Model not trained yet"}), 400
+        return jsonify({"error": "Model has not been trained yet"}), 400
     if "image" not in request.files:
-        return jsonify({"error": "No image file"}), 400
+        return jsonify({"error": "No image matrix file provided"}), 400
 
     data = request.files["image"].read()
     img = load_image(data)
     flat = (rgb_to_grayscale(img) / 255.0).flatten().reshape(1, -1)
+    
     output = softmax(np.dot(relu(np.dot(flat, W1) + b1), W2) + b2)
     idx = int(np.argmax(output))
 
@@ -156,7 +171,7 @@ def predict():
         "probabilities": {people[i]: float(output[0][i]) for i in range(len(people))}
     })
 
-# ── HEALTH ROUTE ─────────────────────────────────────────
+# ── HEURISTIC HEALTH ALIVE INDICATOR ─────────────────────
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
