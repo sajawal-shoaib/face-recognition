@@ -4,7 +4,7 @@ import ResultCard    from "./components/ResultCard.jsx";
 import HistoryTable  from "./components/HistoryTable.jsx";
 import TrainPanel    from "./components/TrainPanel.jsx";
 
-// Use the Vercel env variable automatically, or fall back to local if coding at home
+// Dynamic fallback logic matching your production environment variables
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://face-recognition-backend-o4x9.onrender.com";
 
 export default function App() {
@@ -13,19 +13,21 @@ export default function App() {
   const [status,  setStatus]  = useState("checking...");
 
   useEffect(() => {
-    // Fixed: Swapped /api/predict (POST) with /api/health (GET)
+    // Corrected to hit the GET /api/health endpoint
     fetch(`${API_BASE_URL}/api/health`)
       .then(r => r.json())
       .then(d => {
-        // Handle your health status response checking smoothly
-        setStatus(d.status === "python service unreachable" ? "⚠️ Python Offline" : "✅ Model ready");
+        if (d.status === "python service unreachable") {
+          setStatus("⚠️ Python Offline");
+        } else {
+          setStatus(d.model_trained ? "✅ Model ready" : "⚠️ Not trained yet");
+        }
       })
       .catch(() => setStatus("❌ Service offline"));
     loadHistory();
   }, []);
 
   const loadHistory = () =>
-    // Fixed: Swapped out localhost for your production API base link
     fetch(`${API_BASE_URL}/api/history`)
       .then(r => r.json())
       .then(setHistory)
@@ -36,9 +38,6 @@ export default function App() {
     loadHistory();
   };
 
-  // ... rest of your code (getBadgeStyle, return UI, and styles) remains exactly the same!
-
-  // Dynamically change badge glow based on server status
   const getBadgeStyle = () => {
     if (status.includes("✅")) return { ...styles.badge, ...styles.badgeReady };
     if (status.includes("⚠️")) return { ...styles.badge, ...styles.badgeWarning };
@@ -74,7 +73,6 @@ export default function App() {
 }
 
 const styles = {
-  // Global App Container (Rich Slate Dark Theme)
   app: {
     fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif",
     minHeight: "100vh",
@@ -82,8 +80,6 @@ const styles = {
     color: "#f8fafc",
     WebkitFontSmoothing: "antialiased"
   },
-  
-  // Sleek Header Navbar with Glassmorphism
   header: {
     display: "flex",
     alignItems: "center",
@@ -97,11 +93,7 @@ const styles = {
     zIndex: 100,
     boxShadow: "0 4px 20px -2px rgba(0,0,0,0.3)"
   },
-  logoContainer: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px"
-  },
+  logoContainer: { display: "flex", flexDirection: "column", gap: "2px" },
   title: {
     margin: 0,
     fontSize: "1.4rem",
@@ -111,14 +103,7 @@ const styles = {
     WebkitBackgroundClip: "text",
     WebkitTextFillColor: "transparent"
   },
-  subtitle: {
-    fontSize: "0.75rem",
-    color: "#94a3b8",
-    textTransform: "uppercase",
-    letterSpacing: "0.05em"
-  },
-
-  // Interactive Dynamic Badges
+  subtitle: { fontSize: "0.75rem", color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.05em" },
   badge: {
     padding: "0.5rem 1.2rem",
     borderRadius: "12px",
@@ -128,61 +113,18 @@ const styles = {
     border: "1px solid transparent",
     boxShadow: "0 4px 12px rgba(0,0,0,0.1)"
   },
-  badgeReady: {
-    background: "rgba(16, 185, 129, 0.1)",
-    color: "#34d399",
-    borderColor: "rgba(16, 185, 129, 0.2)",
-    boxShadow: "0 0 15px rgba(16, 185, 129, 0.15)"
-  },
-  badgeWarning: {
-    background: "rgba(245, 158, 11, 0.1)",
-    color: "#fbbf24",
-    borderColor: "rgba(245, 158, 11, 0.2)",
-    boxShadow: "0 0 15px rgba(245, 158, 11, 0.15)"
-  },
-  badgeOffline: {
-    background: "rgba(239, 68, 68, 0.1)",
-    color: "#f87171",
-    borderColor: "rgba(239, 68, 68, 0.2)",
-    boxShadow: "0 0 15px rgba(239, 68, 68, 0.15)"
-  },
-
-  // Layout Grid
-  main: {
-    display: "flex",
-    gap: "2.5rem",
-    padding: "3rem",
-    maxWidth: "1400px",
-    margin: "0 auto",
-    flexWrap: "wrap"
-  },
-  left: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "2rem",
-    flex: "1 1 380px"
-  },
-  right: {
-    flex: "2 1 500px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "2rem"
-  },
-
-  // Interactive Container Wrappers for Child Components
+  badgeReady: { background: "rgba(16, 185, 129, 0.1)", color: "#34d399", borderColor: "rgba(16, 185, 129, 0.2)" },
+  badgeWarning: { background: "rgba(245, 158, 11, 0.1)", color: "#fbbf24", borderColor: "rgba(245, 158, 11, 0.2)" },
+  badgeOffline: { background: "rgba(239, 68, 68, 0.1)", color: "#f87171", borderColor: "rgba(239, 68, 68, 0.2)" },
+  main: { display: "flex", gap: "2.5rem", padding: "3rem", maxWidth: "1400px", margin: "0 auto", flexWrap: "wrap" },
+  left: { display: "flex", flexDirection: "column", gap: "2rem", flex: "1 1 380px" },
+  right: { flex: "2 1 500px", display: "flex", flexDirection: "column", gap: "2rem" },
   cardWrapper: {
     background: "#1e293b",
     borderRadius: "16px",
     border: "1px solid #334155",
     padding: "1.5rem",
-    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3), 0 8px 10px -6px rgba(0, 0, 0, 0.3)",
-    transition: "transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease",
-    cursor: "pointer",
-    // Clean subtle hover state setup
-    ":hover": {
-      transform: "translateY(-2px)",
-      borderColor: "#475569",
-      boxShadow: "0 20px 25px -5px rgba(0, 0, 0, 0.4)"
-    }
+    boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.3)",
+    cursor: "pointer"
   }
 };
