@@ -1,7 +1,8 @@
 import React from "react";
 
 export default function HistoryTable({ history }) {
-  if (!history.length) return null;
+  // Check if history is loading or missing
+  const hasRecords = history && history.length > 0;
 
   return (
     <div style={styles.card}>
@@ -11,46 +12,51 @@ export default function HistoryTable({ history }) {
       </div>
 
       <div style={styles.tableWrapper}>
-        <table style={styles.table}>
-          <thead>
-            <tr>
-              {["Target File", "Classification", "Confidence State", "Timestamp Log"].map((h) => (
-                <th key={h} style={styles.th}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {history.map((row) => (
-              <tr key={row._id} style={styles.tr}>
-                {/* Filename with clean layout clipping */}
-                <td style={styles.tdFilename} title={row.filename}>
-                  <span style={styles.fileIcon}>📄</span>
-                  {row.filename || "—"}
-                </td>
-                
-                {/* Target prediction label match */}
-                <td style={styles.tdWinner}>{row.predicted}</td>
-                
-                {/* Score percentage readout */}
-                <td style={styles.td}>
-                  <div style={styles.confidenceGrid}>
-                    <span style={styles.confidenceText}>{(row.confidence * 100).toFixed(1)}%</span>
-                    <div style={styles.miniTrack}>
-                      <div style={{ ...styles.miniFill, width: `${row.confidence * 100}%` }} />
-                    </div>
-                  </div>
-                </td>
-                
-                {/* Clean string format layout for system clock */}
-                <td style={styles.tdTime}>
-                  {new Date(row.createdAt).toLocaleDateString()} 
-                  <span style={styles.timeDivider}>|</span>
-                  {new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </td>
+        {!hasRecords ? (
+          // ✨ Elegant empty state placeholder instead of returning null!
+          <div style={styles.emptyState}>
+            <span style={styles.emptyIcon}>📂</span>
+            <p style={styles.emptyText}>No historical documents found in database.</p>
+            <p style={styles.emptySubtext}>Run an image matrix prediction below to populate logs.</p>
+          </div>
+        ) : (
+          <table style={styles.table}>
+            <thead>
+              <tr>
+                {["Target File", "Classification", "Confidence State", "Timestamp Log"].map((h) => (
+                  <th key={h} style={styles.th}>{h}</th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {history.map((row) => (
+                <tr key={row._id} style={styles.tr}>
+                  <td style={styles.tdFilename} title={row.filename}>
+                    <span style={styles.fileIcon}>📄</span>
+                    {row.filename || "—"}
+                  </td>
+                  
+                  <td style={styles.tdWinner}>{row.predicted}</td>
+                  
+                  <td style={styles.td}>
+                    <div style={styles.confidenceGrid}>
+                      <span style={styles.confidenceText}>{(row.confidence * 100).toFixed(1)}%</span>
+                      <div style={styles.miniTrack}>
+                        <div style={{ ...styles.miniFill, width: `${row.confidence * 100}%` }} />
+                      </div>
+                    </div>
+                  </td>
+                  
+                  <td style={styles.tdTime}>
+                    {new Date(row.createdAt).toLocaleDateString()} 
+                    <span style={styles.timeDivider}>|</span>
+                    {new Date(row.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );
@@ -109,7 +115,6 @@ const styles = {
   tr: { 
     borderBottom: "1px solid rgba(51, 65, 85, 0.3)",
     transition: "background 0.2s ease",
-    // Clean dynamic zebra row highlights setup
     ":hover": {
       background: "rgba(255,255,255,0.02)"
     }
@@ -147,7 +152,6 @@ const styles = {
     margin: "0 6px",
     opacity: 0.3
   },
-  // Integrated mini micro-charts for inline status rendering
   confidenceGrid: {
     display: "flex",
     flexDirection: "column",
@@ -170,5 +174,30 @@ const styles = {
     height: "100%",
     background: "#818cf8",
     borderRadius: "2px"
+  },
+  // Added Empty State Classes
+  emptyState: {
+    padding: "3rem 2rem",
+    textAlign: "center",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  emptyIcon: {
+    fontSize: "2.5rem",
+    marginBottom: "1rem",
+    opacity: 0.4
+  },
+  emptyText: {
+    margin: "0 0 4px 0",
+    color: "#cbd5e1",
+    fontWeight: "500",
+    fontSize: "0.95rem"
+  },
+  emptySubtext: {
+    margin: 0,
+    color: "#64748b",
+    fontSize: "0.82rem"
   }
 };
