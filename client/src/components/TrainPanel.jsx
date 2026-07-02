@@ -11,7 +11,7 @@ export default function TrainPanel() {
     }
   };
 
-  const handleTrain = async () => {
+ const handleTrain = async () => {
     if (!file) return;
 
     setLoading(true);
@@ -21,7 +21,6 @@ export default function TrainPanel() {
     formData.append("dataset", file); 
 
     try {
-      // 🚀 Safely enclosed inside the async handler where it belongs!
       const res = await fetch("https://face-recognition-python-nnti.onrender.com/train", {
         method: "POST",
         body: formData
@@ -29,10 +28,9 @@ export default function TrainPanel() {
       const data = await res.json();
       setLog(data);
 
-      if (res.ok) {
-        setTimeout(() => {
-          window.location.reload();
-        }, 1000);
+      // 📜 REMOVED window.location.reload() SO YOUR LOG DATA STAYS ON SCREEN!
+      if (!res.ok) {
+        console.error("Pipeline responded with an error status.");
       }
     } catch (e) {
       setLog({ error: e.message });
