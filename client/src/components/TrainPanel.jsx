@@ -1,12 +1,5 @@
 import React, { useState } from "react";
 
-// Use the exact same environment fallback rule we set up in App.jsx
-// Inside client/src/components/TrainPanel.jsx
-const res = await fetch("https://face-recognition-backend-o4x9.onrender.com/api/train", {
-  method: "POST",
-  body: formData
-});
-
 export default function TrainPanel() {
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -18,18 +11,17 @@ export default function TrainPanel() {
     }
   };
 
- const handleTrain = async () => {
+  const handleTrain = async () => {
     if (!file) return;
 
     setLoading(true);
     setLog(null);
 
     const formData = new FormData();
-    // This key matches exactly what Python looks for: request.files["dataset"]
     formData.append("dataset", file); 
 
     try {
-      // 🚀 BYPASS NODE FORWARDING: Send directly to your live Python service!
+      // 🚀 Safely enclosed inside the async handler where it belongs!
       const res = await fetch("https://face-recognition-python-nnti.onrender.com/train", {
         method: "POST",
         body: formData
@@ -141,7 +133,7 @@ const styles = {
     transition: "all 0.2s ease-in-out",
     textAlign: "center"
   }),
-  uploadContent: { display: "flex", flexDirection: "column", alignParagraphs: "center", alignItems: "center", gap: "0.5rem" },
+  uploadContent: { display: "flex", flexDirection: "column", alignItems: "center", gap: "0.5rem" },
   uploadIcon: { fontSize: "2rem", marginBottom: "2px" },
   uploadText: { fontSize: "0.9rem", fontWeight: "500", color: "#e2e8f0" },
   uploadSubtext: { fontSize: "0.75rem", color: "#64748b" },
