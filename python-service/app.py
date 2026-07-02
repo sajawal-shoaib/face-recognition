@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app, supports_credentials=True)
 
 # ── CONFIG ───────────────────────────────────────────────
-IMG_SIZE = 64
+IMG_SIZE = 32
 people = ["sajawal", "ali"]
 
 BASE_DIR = os.path.abspath(os.path.dirname(__file__))
@@ -127,7 +127,7 @@ def train():
         lr = 0.005
 
         # Optimization Loop
-        for epoch in range(150):
+        for epoch in range(60):
             Z1 = np.dot(X, W1) + b1
             A1 = relu(Z1)
             Z2 = np.dot(A1, W2) + b2
