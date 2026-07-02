@@ -1,7 +1,11 @@
 import React, { useState } from "react";
 
 // Use the exact same environment fallback rule we set up in App.jsx
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "https://face-recognition-backend-o4x9.onrender.com";
+// Inside client/src/components/TrainPanel.jsx
+const res = await fetch("https://face-recognition-backend-o4x9.onrender.com/api/train", {
+  method: "POST",
+  body: formData
+});
 
 export default function TrainPanel() {
   const [file, setFile] = useState(null);
