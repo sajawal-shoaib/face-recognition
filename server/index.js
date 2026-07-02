@@ -81,7 +81,7 @@ app.post("/api/predict", upload.single("image"), async (req, res) => {
 // ── POST /api/train ───────────────────────────────────────
 app.post("/api/train", async (req, res) => {
   try {
-    const pyRes  = await fetch(`${PYTHON_URL}/train`, {
+    const pyRes  = await fetch(`${FLASK_SERVICE_URL}/train`, {
       method:  "POST",
       headers: { "Content-Type": "application/json" },
       body:    JSON.stringify({ dataset_path: req.body.dataset_path || "dataset" }),
@@ -108,7 +108,7 @@ app.get("/api/history", async (req, res) => {
 app.get("/api/health", async (req, res) => {
   try {
     // Check if Python service is alive, but don't crash the whole response if it's sleeping
-    const pyRes  = await fetch(`${PYTHON_URL}/health`);
+    const pyRes  = await fetch(`${FLASK_SERVICE_URL}/health`);
     const pythonStatus = pyRes.ok ? await pyRes.json() : { status: "sleeping" };
     
     res.json({
