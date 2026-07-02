@@ -13,21 +13,17 @@ const app    = express();
 const upload = multer({ storage: multer.memoryStorage() });
 
 // 2. Secured Cross-Origin Whitelisting
-// 2. Secured Cross-Origin Whitelisting (Flexible Production Arrays)
-// 2. Secured Cross-Origin Whitelisting (Slash-Proof and Dynamic)
 const allowedOrigins = [
   "http://localhost:5173",
-  "http://localhost:5173/",
-  "https://face-recognition-frontend-seven.vercel.app",
-  "https://face-recognition-frontend-seven.vercel.app/" // Added explicit trailing slash version
+  "https://face-recognition-frontend-seven.vercel.app"
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Allow server-to-server or locally initiated requests
+    // Allow server-to-server, curl, or mobile app requests that lack an origin header
     if (!origin) return callback(null, true);
     
-    // Clean up trailing slash for string matching validation
+    // Clean trailing slashes
     const cleanOrigin = origin.endsWith('/') ? origin.slice(0, -1) : origin;
 
     if (
@@ -35,13 +31,15 @@ app.use(cors({
       allowedOrigins.includes(cleanOrigin) ||
       cleanOrigin.endsWith(".vercel.app")
     ) {
-      callback(null, true);
+      return callback(null, true);
     } else {
-      callback(new Error("Blocked by CORS Security Architecture"));
+      return callback(new Error("Blocked by CORS Security Architecture"));
     }
   },
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200 // Essential for older browser compatibility and some preflight handlers
 }));
+
 app.use(express.json());
 
 // ── MongoDB ───────────────────────────────────────────────
@@ -49,7 +47,7 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB connected successfully"))
   .catch(err => console.error("Database connection error:", err));
 
-const PYTHON_URL = process.env.FLASK_SERVICE_URL || "http://127.0.0.1:5000";
+const PYTHON_URL = process.env.FLASK_SERVICE_URL || "https://face-recognition-python-nnti.onrender.com";
 
 // ── POST /api/predict ─────────────────────────────────────
 app.post("/api/predict", upload.single("image"), async (req, res) => {
@@ -106,13 +104,24 @@ app.get("/api/history", async (req, res) => {
 });
 
 // ── GET /api/health ───────────────────────────────────────
+// Fix: Ensure the route responds immediately to the frontend layout indicator
 app.get("/api/health", async (req, res) => {
   try {
+    // Check if Python service is alive, but don't crash the whole response if it's sleeping
     const pyRes  = await fetch(`${PYTHON_URL}/health`);
-    const result = await pyRes.json();
-    res.json(result);
-  } catch {
-    res.status(503).json({ status: "python service unreachable" });
+    const pythonStatus = pyRes.ok ? await pyRes.json() : { status: "sleeping" };
+    
+    res.json({
+      status: "online",
+      message: "Node pipeline operational",
+      pythonService: pythonStatus
+    });
+  } catch (err) {
+    // Even if Python is completely down, Node is up, so return 200 to clear the offline badge
+    res.json({ 
+      status: "online", 
+      pythonService: "unreachable" 
+    });
   }
 });
 
