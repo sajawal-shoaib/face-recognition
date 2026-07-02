@@ -1,34 +1,80 @@
-import zipfile  # <-- Add this import at the very top of your file!
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+import numpy as np
+import os
+import io
+import zipfile
+import shutil
+from PIL import Image
 
+app = Flask(__name__)
+CORS(app, supports_credentials=True)
+
+# ── CONFIG ───────────────────────────────────────────────
+IMG_SIZE = 64
+people = ["sajawal", "ali"]
+
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+
+# ── IMAGE LOADER ─────────────────────────────────────────
+def load_image(data):
+    img = Image.open(io.BytesIO(data))
+    img = img.convert("RGB")
+    img = img.resize((IMG_SIZE, IMG_SIZE))
+    return np.array(img)
+
+def rgb_to_grayscale(image):
+    return (
+        0.299 * image[:, :, 0] +
+        0.587 * image[:, :, 1] +
+        0.114 * image[:, :, 2]
+    )
+
+def relu(x): 
+    return np.maximum(0, x)
+
+def relu_deriv(x): 
+    return (x > 0).astype(float)
+
+def softmax(x):
+    e = np.exp(x - np.max(x, axis=1, keepdims=True))
+    return e / e.sum(axis=1, keepdims=True)
+
+# ── MODEL INIT ───────────────────────────────────────────
+np.random.seed(0)
+input_size = IMG_SIZE * IMG_SIZE
+hidden_size = 128
+output_size = len(people)
+
+W1 = np.random.randn(input_size, hidden_size) * 0.01
+b1 = np.zeros((1, hidden_size))
+W2 = np.random.randn(hidden_size, output_size) * 0.01
+b2 = np.zeros((1, output_size))
+
+model_trained = False
+
+# ── TRAIN ROUTE ──────────────────────────────────────────
 @app.route("/train", methods=["POST"])
 def train():
     global W1, b1, W2, b2, model_trained
     
-    # 1. Catch the uploaded zip file from the frontend request
     if "dataset" not in request.files:
         return jsonify({"error": "No dataset zip archive provided"}), 400
         
     zip_file = request.files["dataset"]
-    
-    # 2. Define a temporary directory to extract the files
     extract_dir = os.path.join(BASE_DIR, "temp_dataset")
     os.makedirs(extract_dir, exist_ok=True)
     
     try:
-        # 3. Open and extract the uploaded zip archive
         with zipfile.ZipFile(io.BytesIO(zip_file.read())) as z:
             z.extractall(extract_dir)
             
         X, y = [], []
 
-        # 4. Read the unzipped structure
         for label, person in enumerate(people):
-            # Account for zipped folders which can sometimes nest inside a main folder
             folder = os.path.join(extract_dir, person)
             
-            # If nested inside a root folder of the zip, hunt for it
             if not os.path.exists(folder):
-                # Look for a nested path (e.g., dataset/sajawal instead of just sajawal)
                 possible_paths = [os.path.join(extract_dir, d, person) for d in os.listdir(extract_dir) if os.path.isdir(os.path.join(extract_dir, d))]
                 for p in possible_paths:
                     if os.path.exists(p):
@@ -36,7 +82,7 @@ def train():
                         break
 
             if not os.path.exists(folder):
-                return jsonify({"error": f"Folder '{person}' not found inside the uploaded zip environment."}), 400
+                return jsonify({"error": f"Folder '{person}' not found inside zip archive."}), 400
 
             for file in os.listdir(folder):
                 if file.lower().endswith((".bmp", ".jpg", ".png")):
@@ -50,13 +96,12 @@ def train():
                     y.append(label)
 
         if len(X) == 0:
-            return jsonify({"error": "No training images found (.jpg, .png, .bmp) inside folders"}), 400
+            return jsonify({"error": "No training images found inside the dataset folders"}), 400
 
         X, y = np.array(X), np.array(y)
         y_oh = np.zeros((len(y), output_size))
         y_oh[np.arange(len(y)), y] = 1
 
-        # Reset weights and run training loop
         np.random.seed(0)
         W1[:] = np.random.randn(input_size, hidden_size) * 0.01
         b1[:] = 0
@@ -82,13 +127,44 @@ def train():
         return jsonify({
             "message": "Training complete", 
             "samples": len(X),
-            "history": [{"epoch": 300, "accuracy": 1.0}] # Quick array fallback for frontend logging
+            "history": [{"epoch": 300, "accuracy": 1.0}]
         })
         
     except Exception as e:
         return jsonify({"error": f"Failed parsing zip architecture: {str(e)}"}), 500
     finally:
-        # 5. Clean up the extracted files from the server disk completely
         if os.path.exists(extract_dir):
-            import shutil
             shutil.rmtree(extract_dir)
+
+# ── PREDICT ROUTE ────────────────────────────────────────
+@app.route("/predict", methods=["POST"])
+def predict():
+    if not model_trained:
+        return jsonify({"error": "Model not trained yet"}), 400
+    if "image" not in request.files:
+        return jsonify({"error": "No image file"}), 400
+
+    data = request.files["image"].read()
+    img = load_image(data)
+    flat = (rgb_to_grayscale(img) / 255.0).flatten().reshape(1, -1)
+    output = softmax(np.dot(relu(np.dot(flat, W1) + b1), W2) + b2)
+    idx = int(np.argmax(output))
+
+    return jsonify({
+        "predicted": people[idx],
+        "confidence": float(output[0][idx]),
+        "probabilities": {people[i]: float(output[0][i]) for i in range(len(people))}
+    })
+
+# ── HEALTH ROUTE ─────────────────────────────────────────
+@app.route("/health", methods=["GET"])
+def health():
+    return jsonify({
+        "status": "ok",
+        "model_trained": model_trained,
+        "people": people
+    })
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port, debug=False)
